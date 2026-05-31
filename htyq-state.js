@@ -79,6 +79,7 @@ window.HTYQ_STATE = (function() {
             crossRegionMemo: '',
             bloodFeudMemo: '',
             reputationChange: '',
+            activeContactBanner: null,
             lastUpdated: {}
         };
     }

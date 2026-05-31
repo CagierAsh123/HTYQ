@@ -7,11 +7,21 @@ window.HTYQ_UI_DASHBOARD = (function() {
     function render(container) {
         const s = STATE.worldState;
         const eco = s.economy;
-        const currencyDisplay = (eco.currencyName && eco.currencyAmount !== null) 
-            ? `${eco.currencyAmount} ${eco.currencyName}` 
+        const currencyDisplay = (eco.currencyName && eco.currencyAmount !== null)
+            ? `${eco.currencyAmount} ${eco.currencyName}`
             : (eco.currencyName ? `0 ${eco.currencyName}` : '未定义货币');
 
-        container.innerHTML = `
+        // 主动接触横幅（从世界状态读取，8秒后自动清除）
+        let bannerHtml = '';
+        if (s.activeContactBanner) {
+            bannerHtml = `<div class="htyq-red-warning" style="margin-bottom:12px;">🔥 主动接触！ ${escapeHtml(s.activeContactBanner.details)}</div>`;
+            setTimeout(() => {
+                s.activeContactBanner = null;
+                STATE.saveWorldState();
+            }, 8000);
+        }
+
+        container.innerHTML = bannerHtml + `
             <div class="htyq-card"><h3>⏰ 时间</h3><div>${escapeHtml(s.worldTime || '未知')}</div></div>
             <div class="htyq-card"><h3>🌍 世界状态摘要</h3><div class="htyq-digest">${escapeHtml(s.worldDigest)}</div></div>
             <div class="htyq-card"><h3>📌 整体氛围 / 驱动事件</h3><div>${escapeHtml(s.overallAtmosphere)} | ${escapeHtml(s.drivingEvent)}</div></div>

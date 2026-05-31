@@ -54,60 +54,10 @@ window.HTYQ_EVOLUTION = (function() {
         const deletedCount = STATE.clearWorldsBySource(['character', 'global']);
         if (deletedCount > 0) console.log(`[HTYQ] 已清理 ${deletedCount} 个旧世界书`);
 
-        const ctx = SillyTavern.getContext();
-        const activeWorlds = [];
-
-        try {
-            const char = ctx.characters?.[ctx.characterId];
-            const charWorld = char?.data?.extensions?.world;
-            if (charWorld) {
-                const book = await ctx.loadWorldInfo(charWorld);
-                if (book && book.entries) {
-                    activeWorlds.push({
-                        source: 'character',
-                        name: charWorld,
-                        entries: Object.values(book.entries).filter(e => !e.disable)
-                    });
-                }
-            }
-        } catch(e) { console.warn('读取角色世界书失败', e); }
-
-        try {
-            const headers = ctx.getRequestHeaders ? ctx.getRequestHeaders() : {};
-            const resp = await fetch('/api/settings/get', {
-                method: 'POST',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: '{}'
-            });
-            if (resp.ok) {
-                const settings = await resp.json();
-                const real = JSON.parse(settings.settings);
-                const globals = real?.world_info_settings?.world_info?.globalSelect || [];
-                for (const name of globals) {
-                    const book = await ctx.loadWorldInfo(name);
-                    if (book && book.entries) {
-                        activeWorlds.push({
-                            source: 'global',
-                            name: name,
-                            entries: Object.values(book.entries).filter(e => !e.disable)
-                        });
-                    }
-                }
-            }
-        } catch(e) { console.warn('读取全局世界书失败', e); }
-
-        function entriesToText(entries) {
-            let text = '';
-            for (const entry of entries) {
-                const title = entry.comment || entry.key?.join(', ') || '条目';
-                const content = entry.content || '';
-                text += `### ${title}\n${content}\n\n`;
-            }
-            return text.trim();
-        }
+        const activeWorlds = await utils.fetchActiveWorldbooks();
 
         for (const w of activeWorlds) {
-            const textContent = entriesToText(w.entries);
+            const textContent = utils.entriesToText(w.entries);
             STATE.addWorldbookWithSource(w.name, textContent, w.source, true);
         }
         console.log(`[HTYQ] 同步完成，导入了 ${activeWorlds.length} 个世界书`);

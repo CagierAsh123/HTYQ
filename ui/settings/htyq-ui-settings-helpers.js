@@ -1,18 +1,10 @@
-// 辅助函数模块：entriesToText, showEntrySelectionDialog 等
+// 辅助函数模块：showEntrySelectionDialog 等
 window.__HTYQ_UI_SETTINGS_HELPERS = (function() {
     const utils = window.HTYQ_UTILS;
     const escapeHtml = utils.escapeHtml;
 
-    // 将世界书 entries 转换为纯文本
-    function entriesToText(entries) {
-        let text = '';
-        for (const entry of entries) {
-            const title = entry.comment || entry.key?.join(', ') || '条目';
-            const content = entry.content || '';
-            text += `### ${title}\n${content}\n\n`;
-        }
-        return text.trim();
-    }
+    // entriesToText 统一在 HTYQ_UTILS 中，直接引用 utils.entriesToText
+    const entriesToText = utils.entriesToText;
 
     // 显示条目选择弹窗（多选）
     function showEntrySelectionDialog(worldName, entries) {

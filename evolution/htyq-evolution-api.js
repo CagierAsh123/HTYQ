@@ -104,54 +104,24 @@ window.HTYQ_EVOLUTION_API = (function() {
         try {
             const prompt = await promptBuilder.buildEvolutionPrompt();
             console.log('推演 Prompt 长度:', prompt.length);
-            let rawResult;
-            const settings = STATE.globalApiSettings;
-            if (settings.apiMode === 'custom' && settings.customUrl) {
-                const response = await fetch(getCustomApiUrl(settings.customUrl), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.customKey}` },
-                    body: JSON.stringify({
-                        model: settings.customModel || 'gpt-3.5-turbo',
-                        messages: [
-                            { role: 'system', content: '你是活体世界引擎，只返回纯净JSON，不要包含任何额外解释。' },
-                            { role: 'user', content: prompt }
-                        ],
-                        temperature: 0.8
-                    })
-                });
-                if (!response.ok) throw new Error(`API HTTP ${response.status}`);
-                const data = await response.json();
-                rawResult = data.choices[0].message.content;
-            } else {
-                const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) ? SillyTavern.getContext() : getContext();
-                if (!ctx.generateRaw) throw new Error('当前环境不支持 generateRaw');
-                rawResult = await ctx.generateRaw({ prompt, max_tokens: 4000, temperature: 0.8, should_stream: false });
-                if (typeof rawResult !== 'string') rawResult = rawResult.text || String(rawResult);
-            }
-            console.log('原始返回内容:', rawResult);
-            let jsonStr = rawResult.trim().replace(/```json/g, '').replace(/```/g, '');
-            const firstBrace = jsonStr.indexOf('{');
-            const lastBrace = jsonStr.lastIndexOf('}');
-            if (firstBrace === -1 || lastBrace === -1) throw new Error('返回内容不包含有效的JSON对象');
-            jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-            const evolutionData = JSON.parse(jsonStr);
+            const evolutionData = await callRawAPI(prompt, '推演');
+            if (!evolutionData) throw new Error('API 返回无效数据');
             console.log('解析后的数据:', evolutionData);
             const success = core.applyEvolution(evolutionData);
             if (!success) throw new Error('应用数据失败');
             STATE.worldState.round++;
             STATE.saveWorldState();
             if (window.HTYQ_UI && window.HTYQ_UI.refresh) window.HTYQ_UI.refresh();
+            const settings = STATE.globalApiSettings;
             if (settings.autoInject) injectWorldSummaryToChat();
             if (evolutionData.active_contact) {
                 utils.showFloatingWarning(`⚠️ 主动接触: ${evolutionData.active_contact.summary}`, true);
-                const dashboardView = document.getElementById('htyq-view-dashboard');
-                if (dashboardView && dashboardView.offsetParent !== null) {
-                    const banner = document.createElement('div');
-                    banner.className = 'htyq-red-warning';
-                    banner.innerHTML = `🔥 主动接触！ ${evolutionData.active_contact.details}`;
-                    dashboardView.prepend(banner);
-                    setTimeout(() => banner.remove(), 8000);
-                }
+                STATE.worldState.activeContactBanner = {
+                    summary: evolutionData.active_contact.summary,
+                    details: evolutionData.active_contact.details,
+                    timestamp: Date.now()
+                };
+                STATE.saveWorldState();
                 await utils.insertActiveContactMessage(evolutionData.active_contact.details);
             }
             currentRetry = 0;

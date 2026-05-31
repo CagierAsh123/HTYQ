@@ -5,6 +5,6 @@
   "version": "1.5.0",
   "license": "MIT",
   "type": "extension",
-  "js": "main.js",
+  "js": ["module-loader.js", "main.js"],
   "css": "style.css"
 }

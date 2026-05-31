@@ -134,7 +134,7 @@ window.HTYQ_UTILS = (function() {
         }
     }
 
-    // 新增：测试世界书是否可读（供UI调用）
+    // 测试世界书是否可读（供UI调用）
     async function testWorldReadable(worldName) {
         const content = await getWorldContent(worldName);
         if (content && content.length > 0) {
@@ -144,6 +144,70 @@ window.HTYQ_UTILS = (function() {
         }
     }
 
+    // 将世界书 entries 数组转换为纯文本（统一实现）
+    function entriesToText(entries) {
+        let text = '';
+        for (const entry of entries) {
+            const title = entry.comment || entry.key?.join(', ') || '条目';
+            const content = entry.content || '';
+            text += `### ${title}\n${content}\n\n`;
+        }
+        return text.trim();
+    }
+
+    // 获取当前所有激活的世界书（角色绑定 + 全局启用）
+    async function fetchActiveWorldbooks() {
+        const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext)
+            ? SillyTavern.getContext()
+            : (typeof getContext === 'function' ? getContext() : null);
+        if (!ctx) return [];
+
+        const result = [];
+
+        // 角色绑定世界书
+        try {
+            const char = ctx.characters?.[ctx.characterId];
+            const charWorld = char?.data?.extensions?.world;
+            if (charWorld) {
+                const book = await ctx.loadWorldInfo(charWorld);
+                if (book && book.entries) {
+                    result.push({
+                        source: 'character',
+                        name: charWorld,
+                        entries: Object.values(book.entries).filter(e => !e.disable)
+                    });
+                }
+            }
+        } catch(e) { console.warn('[HTYQ] 读取角色世界书失败', e); }
+
+        // 全局启用的世界书
+        try {
+            const headers = ctx.getRequestHeaders ? ctx.getRequestHeaders() : {};
+            const resp = await fetch('/api/settings/get', {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: '{}'
+            });
+            if (resp.ok) {
+                const settings = await resp.json();
+                const real = JSON.parse(settings.settings);
+                const globals = real?.world_info_settings?.world_info?.globalSelect || [];
+                for (const name of globals) {
+                    const book = await ctx.loadWorldInfo(name);
+                    if (book && book.entries) {
+                        result.push({
+                            source: 'global',
+                            name: name,
+                            entries: Object.values(book.entries).filter(e => !e.disable)
+                        });
+                    }
+                }
+            }
+        } catch(e) { console.warn('[HTYQ] 读取全局世界书失败', e); }
+
+        return result;
+    }
+
     return {
         escapeHtml,
         showFloatingWarning,
@@ -151,6 +215,8 @@ window.HTYQ_UTILS = (function() {
         insertActiveContactMessage,
         getAllWorlds,
         getWorldContent,
-        testWorldReadable
+        testWorldReadable,
+        entriesToText,
+        fetchActiveWorldbooks
     };
 })();

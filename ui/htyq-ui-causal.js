@@ -1,23 +1,12 @@
 // 因果链渲染模块
-window.HTYQ_UI_CAUSAL = (function() {
-    const STATE = window.HTYQ_STATE;
-    const utils = window.HTYQ_UTILS;
-    const escapeHtml = utils.escapeHtml;
-
-    function render(container) {
-        const s = STATE.worldState;
-        if (!s.causalChain.length) {
-            container.innerHTML = '<div class="htyq-card">暂无因果链追踪</div>';
-            return;
-        }
-        container.innerHTML = s.causalChain.map(c => `
-            <div class="htyq-card">
-                <h3>🔗 ${escapeHtml(c.rumorOrEvent)}</h3>
-                <div><strong>进展:</strong> ${escapeHtml(c.progress)}</div>
-                <div><strong>本轮体现:</strong> ${escapeHtml(c.manifestation)}</div>
-            </div>
-        `).join('');
+window.HTYQ_UI_CAUSAL = window.HTYQ_UI_RENDERER_FACTORY.createListViewRenderer(
+    'causalChain', '暂无因果链追踪',
+    c => {
+        const esc = window.HTYQ_UI_RENDERER_FACTORY.escapeHtml;
+        return `<div class="htyq-card">
+            <h3>🔗 ${esc(c.rumorOrEvent)}</h3>
+            <div><strong>进展:</strong> ${esc(c.progress)}</div>
+            <div><strong>本轮体现:</strong> ${esc(c.manifestation)}</div>
+        </div>`;
     }
-
-    return { render };
-})();
+);
