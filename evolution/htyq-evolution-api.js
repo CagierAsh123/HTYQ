@@ -139,8 +139,6 @@ window.HTYQ_EVOLUTION_API = (function() {
         }
     }
 
-    let worldbookActivated = false;
-
     function injectWorldSummaryToChat() {
         const s = STATE.worldState;
         const rep = s.reputation;
@@ -156,56 +154,18 @@ window.HTYQ_EVOLUTION_API = (function() {
             const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext)
                 ? SillyTavern.getContext()
                 : (typeof getContext === 'function' ? getContext() : null);
-            if (!ctx || typeof ctx.saveWorldInfo !== 'function') return;
+            if (!ctx || !ctx.extensionPrompts) return;
 
-            // 构建世界书条目（constant=true 始终激活，不依赖关键词）
-            const worldData = {
-                entries: {
-                    '0': {
-                        uid: 0,
-                        key: [],
-                        secondary_keys: [],
-                        comment: '活体引擎世界状态',
-                        content: injectContent,
-                        constant: true,
-                        selective: false,
-                        order: 100,
-                        position: 'before_char',
-                        disable: false
-                    }
-                }
+            // 直接写 extension_prompts 对象 — ST 的 prompt 组装器从这里读取
+            // position: 1 = IN_CHAT（注入到聊天消息中），按 depth=0 插入最新消息附近
+            // 内存级、session 级，不落盘，切换聊天自然隔离
+            ctx.extensionPrompts['htyq_inject'] = {
+                value: injectContent,
+                position: 1,
+                depth: 0,
+                scan: true,
+                role: 0
             };
-
-            ctx.saveWorldInfo('htyq_living_world', worldData).then(async () => {
-                // 首次运行时，将世界书加入全局激活列表
-                if (!worldbookActivated) {
-                    worldbookActivated = true;
-                    try {
-                        const headers = ctx.getRequestHeaders ? ctx.getRequestHeaders() : {};
-                        const resp = await fetch('/api/settings/get', {
-                            method: 'POST',
-                            headers: { ...headers, 'Content-Type': 'application/json' },
-                            body: '{}'
-                        });
-                        if (resp.ok) {
-                            const data = await resp.json();
-                            const real = JSON.parse(data.settings);
-                            const globalSelect = real?.world_info_settings?.world_info?.globalSelect || [];
-                            if (!globalSelect.includes('htyq_living_world')) {
-                                globalSelect.push('htyq_living_world');
-                                await fetch('/api/settings/save', {
-                                    method: 'POST',
-                                    headers: { ...headers, 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(real)
-                                });
-                                console.log('[HTYQ] 活体世界书已激活');
-                            }
-                        }
-                    } catch(e) {
-                        console.warn('[HTYQ] 自动激活世界书失败，请手动在ST全局世界书中启用 htyq_living_world', e);
-                    }
-                }
-            }).catch(e => console.warn('[HTYQ] 保存世界书失败', e));
         } catch(e) {}
     }
 
