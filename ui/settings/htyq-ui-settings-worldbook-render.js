@@ -35,6 +35,7 @@ window.__HTYQ_UI_SETTINGS_WORLDBOOK_RENDER = (function() {
                                 </div>
                                 <div>
                                     <button class="htyq-test-world-btn" data-index="${idx}" style="background:#8b5cf6; border:none; color:white; border-radius:4px; padding:4px 10px; margin-right:6px; cursor:pointer;">🔍 测试</button>
+                                    <button class="htyq-edit-world-btn" data-index="${idx}" style="background:#f59e0b; border:none; color:white; border-radius:4px; padding:4px 10px; margin-right:6px; cursor:pointer;">✏️ 修改</button>
                                     <button class="htyq-del-world-btn" data-index="${idx}" style="background:#ef4444; border:none; color:white; border-radius:4px; padding:4px 10px; cursor:pointer;">删除</button>
                                 </div>
                             </div>
@@ -127,6 +128,15 @@ window.__HTYQ_UI_SETTINGS_WORLDBOOK_RENDER = (function() {
             });
         });
 
+        container.querySelectorAll('.htyq-edit-world-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index);
+                const world = worlds[idx];
+                if (!world) return;
+                showEditDialog(world, refreshList);
+            });
+        });
+
         container.querySelectorAll('.htyq-del-world-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.dataset.index);
@@ -148,6 +158,47 @@ window.__HTYQ_UI_SETTINGS_WORLDBOOK_RENDER = (function() {
                 }
             });
         });
+    }
+
+    function showEditDialog(world, onSaved) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10007; display:flex; align-items:center; justify-content:center;';
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:#1e2937; border-radius:12px; padding:20px; width:600px; max-width:90%; max-height:90%; border:1px solid #334155; display:flex; flex-direction:column;';
+        dialog.innerHTML = `
+            <h3 style="margin:0 0 12px 0; font-size:16px; color:#f59e0b;">✏️ 修改世界书</h3>
+            <div style="margin-bottom:8px;">
+                <label style="font-size:12px; color:#94a3b8;">名称</label>
+                <input type="text" id="htyq-edit-name" value="${escapeHtml(world.name)}" style="width:100%; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:8px; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:12px; flex:1; display:flex; flex-direction:column;">
+                <label style="font-size:12px; color:#94a3b8;">内容</label>
+                <textarea id="htyq-edit-content" style="width:100%; flex:1; min-height:300px; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:8px; font-family:monospace; font-size:12px; resize:vertical; box-sizing:border-box;">${escapeHtml(world.content)}</textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button id="htyq-edit-cancel-btn" style="background:#334155; border:none; color:#e2e8f0; padding:8px 16px; border-radius:6px; cursor:pointer;">取消</button>
+                <button id="htyq-edit-save-btn" style="background:#f59e0b; border:none; color:white; padding:8px 16px; border-radius:6px; cursor:pointer;">保存</button>
+            </div>
+        `;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        const nameInput = dialog.querySelector('#htyq-edit-name');
+        const contentInput = dialog.querySelector('#htyq-edit-content');
+        const close = () => overlay.remove();
+
+        dialog.querySelector('#htyq-edit-cancel-btn').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+        dialog.querySelector('#htyq-edit-save-btn').onclick = () => {
+            const newName = nameInput.value.trim();
+            if (!newName) { utils.showFloatingWarning('名称不能为空', true); return; }
+            world.name = newName;
+            world.content = contentInput.value;
+            STATE.saveWorldState();
+            close();
+            onSaved();
+            utils.showFloatingWarning(`已保存「${newName}」`, false);
+        };
     }
 
     return { renderWorldList };
