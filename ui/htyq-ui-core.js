@@ -93,6 +93,7 @@ window.HTYQ_UI = (function() {
             <div class="htyq-footer">
                 <button id="htyq-evolve-btn" class="htyq-evolve-btn">🌀 手动推演一轮</button>
                 <button id="htyq-refresh-btn" class="htyq-small-btn" style="background:#3b82f6;">🔄 刷新面板</button>
+                <button id="htyq-migrate-btn" class="htyq-small-btn" style="background:#10b981;">📥 同步世界书</button>
                 <div class="htyq-stats">轮次: <span id="htyq-round">0</span> | 货币: <span id="htyq-currency">0 未定义</span></div>
             </div>
         `;
@@ -110,6 +111,19 @@ window.HTYQ_UI = (function() {
                 STATE.loadWorldState();
                 refresh();
                 utils.showFloatingWarning('已重新加载当前聊天的世界状态', false);
+            });
+        }
+
+        // 同步世界书按钮 — 手动将世界状态注入到角色世界书
+        const migrateBtn = document.getElementById('htyq-migrate-btn');
+        if (migrateBtn) {
+            migrateBtn.addEventListener('click', () => {
+                if (window.HTYQ_EVOLUTION_API && window.HTYQ_EVOLUTION_API.injectWorldSummaryToChat) {
+                    window.HTYQ_EVOLUTION_API.injectWorldSummaryToChat();
+                    utils.showFloatingWarning('世界状态已同步到角色世界书', false);
+                } else {
+                    utils.showFloatingWarning('推演模块未就绪，请刷新页面', true);
+                }
             });
         }
 
