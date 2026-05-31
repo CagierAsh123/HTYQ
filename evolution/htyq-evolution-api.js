@@ -141,76 +141,73 @@ window.HTYQ_EVOLUTION_API = (function() {
 
     function injectWorldSummaryToChat() {
         const s = STATE.worldState;
-        const rep = s.reputation;
-        const repStr = `江湖:${rep.jianghu} 官府:${rep.official} 民间:${rep.folk} 黑道:${rep.underworld}`;
-        const pending = s.pendingEvents.length ? s.pendingEvents.join('；') : '无';
-        const injectContent = `【世界时间】${s.worldTime || '未知'}
-【世界大势】${s.worldDigest}
-【氛围】${s.overallAtmosphere || '无'} | 治安：${s.securityStatus || '无'} | 星象：${s.astrology || '无'}
-【待爆发事件】${pending}
-【声誉】${repStr}`;
+        const eco = s.economy;
+        const currencyDisplay = (eco.currencyName && eco.currencyAmount !== null)
+            ? `${eco.currencyAmount} ${eco.currencyName}` : '未定义';
+
+        // 活跃事件链摘要
+        const activeEvents = s.events.slice(0, 3).map(e =>
+            `「${e.name}」Lv.${e.level||'?'} ${e.stage||''} (${e.currentRound||0}/${e.totalRounds||'?'})`).join('；') || '无';
+
+        // 势力动态
+        const factionInfo = s.factions.slice(0, 3).map(f =>
+            `「${f.name}」目标:${f.current_goal||'无'} 凝聚力:${f.cohesion||'?'} 对主角:${f.attention_to_user||'无'}`).join('；') || '无';
+
+        // 流言
+        const rumorInfo = s.rumors.slice(0, 3).map(r =>
+            `[${r.type||'流言'}] ${r.content||r.text||''} (可信:${r.credibility||'?'})`).join('；') || '无';
+
+        const injectContent = `<htyq_world>
+【时间】${s.worldTime || '未知'} | 第${s.round}轮
+【大势】${s.worldDigest}
+【氛围】${s.overallAtmosphere || '无'} | 治安:${s.securityStatus || '无'} | 星象:${s.astrology || '无'}
+【三层】直:${s.directLayer || '无'} | 近:${s.nearLayer || '无'} | 远:${s.farLayer || '无'}
+【资产】${currencyDisplay} | ${eco.fundsStatus||'未知'} | 市场:${eco.marketTrend||'平稳'}
+【声誉】江湖:${s.reputation.jianghu} 官府:${s.reputation.official} 民间:${s.reputation.folk} 黑道:${s.reputation.underworld}
+【事件链】${activeEvents}
+【势力】${factionInfo}
+【流言】${rumorInfo}
+【待爆发】${s.pendingEvents.length ? s.pendingEvents.join('；') : '无'}
+</htyq_world>`;
 
         try {
             const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext)
                 ? SillyTavern.getContext()
                 : (typeof getContext === 'function' ? getContext() : null);
-            if (!ctx || typeof ctx.loadWorldInfo !== 'function') return;
+            if (!ctx || !ctx.extensionPrompts) return;
 
-            // 获取角色绑定的世界书名
+            // 直接写 ST 内存中的 extension_prompts 对象
+            // position:1=IN_CHAT, depth:0=最新消息附近, role:0=SYSTEM
+            ctx.extensionPrompts['htyq_inject'] = {
+                value: injectContent,
+                position: 1,
+                depth: 0,
+                scan: true,
+                role: 0
+            };
+
+            // 同时写世界书作为持久化备份（角色绑定的世界书）
             const char = ctx.characters?.[ctx.characterId];
             const charWorld = char?.data?.extensions?.world;
-            const bookName = charWorld || 'htyq_living_world';
-
-            ctx.loadWorldInfo(bookName).then(book => {
-                const entries = (book && book.entries) ? { ...book.entries } : {};
-                // 查找已有的活体引擎条目（通过 comment 匹配）
-                const existingKey = Object.keys(entries).find(k => entries[k].comment === '活体引擎世界状态');
-                const uid = existingKey || String(Date.now());
-
-                entries[uid] = {
-                    uid: Number(uid),
-                    key: existingKey ? entries[existingKey].key : ['htyq_world_state'],
-                    secondary_keys: [],
-                    comment: '活体引擎世界状态',
-                    content: injectContent,
-                    constant: true,
-                    selective: false,
-                    order: existingKey ? entries[existingKey].order : 100,
-                    position: 'before_char',
-                    disable: false
-                };
-
-                ctx.saveWorldInfo(bookName, { entries }).then(() => {
-                    // 确保世界书在全局激活列表中
-                    ensureGlobalActivation(ctx, bookName);
-                }).catch(e => console.warn('[HTYQ] 保存角色世界书失败', e));
-            }).catch(e => console.warn('[HTYQ] 加载角色世界书失败', e));
-        } catch(e) {}
-    }
-
-    let activationTried = {};
-    async function ensureGlobalActivation(ctx, bookName) {
-        if (activationTried[bookName]) return;
-        activationTried[bookName] = true;
-        try {
-            const headers = ctx.getRequestHeaders ? ctx.getRequestHeaders() : {};
-            const resp = await fetch('/api/settings/get', {
-                method: 'POST',
-                headers: { ...headers, 'Content-Type': 'application/json' },
-                body: '{}'
-            });
-            if (!resp.ok) return;
-            const data = await resp.json();
-            const real = JSON.parse(data.settings);
-            const globalSelect = real?.world_info_settings?.world_info?.globalSelect || [];
-            if (!globalSelect.includes(bookName)) {
-                globalSelect.push(bookName);
-                await fetch('/api/settings/save', {
-                    method: 'POST',
-                    headers: { ...headers, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(real)
-                });
-                console.log('[HTYQ] 世界书已加入全局激活:', bookName);
+            if (charWorld && typeof ctx.loadWorldInfo === 'function') {
+                ctx.loadWorldInfo(charWorld).then(book => {
+                    const entries = (book && book.entries) ? { ...book.entries } : {};
+                    const existingKey = Object.keys(entries).find(k => entries[k].comment === '活体引擎世界状态');
+                    const uid = existingKey || String(Date.now());
+                    entries[uid] = {
+                        uid: Number(uid),
+                        key: ['htyq_world_state'],
+                        keysecondary: [],
+                        comment: '活体引擎世界状态',
+                        content: injectContent,
+                        constant: true,
+                        selective: false,
+                        order: existingKey ? entries[existingKey].order : 100,
+                        position: 'before_char',
+                        disable: false
+                    };
+                    ctx.saveWorldInfo(charWorld, { entries });
+                }).catch(() => {});
             }
         } catch(e) {}
     }
