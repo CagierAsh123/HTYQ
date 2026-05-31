@@ -141,13 +141,19 @@ window.HTYQ_EVOLUTION_API = (function() {
 
     function injectWorldSummaryToChat() {
         const s = STATE.worldState;
-        // 精简注入：只给 AI 世界元数据，不包含对对话内容的复述，避免上下文重复
         const rep = s.reputation;
         const repStr = `江湖:${rep.jianghu} 官府:${rep.official} 民间:${rep.folk} 黑道:${rep.underworld}`;
-        const injectContent = `<htyq_world>\n星象:${s.astrology} 治安:${s.securityStatus} 氛围:${s.overallAtmosphere}\n声誉:${repStr}\n</htyq_world>`;
+        const pending = s.pendingEvents.length ? s.pendingEvents.join('；') : '无';
+        const injectContent = `<htyq_world>
+【世界时间】${s.worldTime || '未知'}
+【世界大势】${s.worldDigest}
+【氛围】${s.overallAtmosphere || '无'} | 治安：${s.securityStatus || '无'} | 星象：${s.astrology || '无'}
+【待爆发事件】${pending}
+【声誉】${repStr}
+</htyq_world>`;
         try {
             if (typeof injectPrompts === 'function') {
-                const result = injectPrompts([{ id: 'htyq_inject', position: 'in_chat', depth: 0, role: 'system', content: injectContent, should_scan: true }]);
+                const result = injectPrompts([{ id: 'htyq_inject', position: 'before_main', depth: 0, role: 'system', content: injectContent, should_scan: true }]);
                 if (result && result.uninject) {
                     if (window.htyq_uninject) window.htyq_uninject();
                     window.htyq_uninject = result.uninject;
