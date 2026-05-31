@@ -154,18 +154,64 @@ window.HTYQ_EVOLUTION_API = (function() {
             const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext)
                 ? SillyTavern.getContext()
                 : (typeof getContext === 'function' ? getContext() : null);
-            if (!ctx || !ctx.extensionPrompts) return;
+            if (!ctx || typeof ctx.loadWorldInfo !== 'function') return;
 
-            // 直接写 extension_prompts 对象 — ST 的 prompt 组装器从这里读取
-            // position: 1 = IN_CHAT（注入到聊天消息中），按 depth=0 插入最新消息附近
-            // 内存级、session 级，不落盘，切换聊天自然隔离
-            ctx.extensionPrompts['htyq_inject'] = {
-                value: injectContent,
-                position: 1,
-                depth: 0,
-                scan: true,
-                role: 0
-            };
+            // 获取角色绑定的世界书名
+            const char = ctx.characters?.[ctx.characterId];
+            const charWorld = char?.data?.extensions?.world;
+            const bookName = charWorld || 'htyq_living_world';
+
+            ctx.loadWorldInfo(bookName).then(book => {
+                const entries = (book && book.entries) ? { ...book.entries } : {};
+                // 查找已有的活体引擎条目（通过 comment 匹配）
+                const existingKey = Object.keys(entries).find(k => entries[k].comment === '活体引擎世界状态');
+                const uid = existingKey || String(Date.now());
+
+                entries[uid] = {
+                    uid: Number(uid),
+                    key: existingKey ? entries[existingKey].key : ['htyq_world_state'],
+                    secondary_keys: [],
+                    comment: '活体引擎世界状态',
+                    content: injectContent,
+                    constant: true,
+                    selective: false,
+                    order: existingKey ? entries[existingKey].order : 100,
+                    position: 'before_char',
+                    disable: false
+                };
+
+                ctx.saveWorldInfo(bookName, { entries }).then(() => {
+                    // 确保世界书在全局激活列表中
+                    ensureGlobalActivation(ctx, bookName);
+                }).catch(e => console.warn('[HTYQ] 保存角色世界书失败', e));
+            }).catch(e => console.warn('[HTYQ] 加载角色世界书失败', e));
+        } catch(e) {}
+    }
+
+    let activationTried = {};
+    async function ensureGlobalActivation(ctx, bookName) {
+        if (activationTried[bookName]) return;
+        activationTried[bookName] = true;
+        try {
+            const headers = ctx.getRequestHeaders ? ctx.getRequestHeaders() : {};
+            const resp = await fetch('/api/settings/get', {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: '{}'
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const real = JSON.parse(data.settings);
+            const globalSelect = real?.world_info_settings?.world_info?.globalSelect || [];
+            if (!globalSelect.includes(bookName)) {
+                globalSelect.push(bookName);
+                await fetch('/api/settings/save', {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(real)
+                });
+                console.log('[HTYQ] 世界书已加入全局激活:', bookName);
+            }
         } catch(e) {}
     }
 
