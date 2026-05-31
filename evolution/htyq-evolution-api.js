@@ -152,12 +152,12 @@ window.HTYQ_EVOLUTION_API = (function() {
 【声誉】${repStr}
 </htyq_world>`;
         try {
-            if (typeof injectPrompts === 'function') {
-                const result = injectPrompts([{ id: 'htyq_inject', position: 'before_main', depth: 0, role: 'system', content: injectContent, should_scan: true }]);
-                if (result && result.uninject) {
-                    if (window.htyq_uninject) window.htyq_uninject();
-                    window.htyq_uninject = result.uninject;
-                }
+            const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext)
+                ? SillyTavern.getContext()
+                : (typeof getContext === 'function' ? getContext() : null);
+            if (ctx && typeof ctx.setExtensionPrompt === 'function') {
+                // position: 2 = BEFORE_PROMPT（故事字符串之前）
+                ctx.setExtensionPrompt('htyq_inject', injectContent, 2, 0, true, 0);
             }
         } catch(e) {}
     }
