@@ -139,26 +139,73 @@ window.HTYQ_EVOLUTION_API = (function() {
         }
     }
 
+    let worldbookActivated = false;
+
     function injectWorldSummaryToChat() {
         const s = STATE.worldState;
         const rep = s.reputation;
         const repStr = `江湖:${rep.jianghu} 官府:${rep.official} 民间:${rep.folk} 黑道:${rep.underworld}`;
         const pending = s.pendingEvents.length ? s.pendingEvents.join('；') : '无';
-        const injectContent = `<htyq_world>
-【世界时间】${s.worldTime || '未知'}
+        const injectContent = `【世界时间】${s.worldTime || '未知'}
 【世界大势】${s.worldDigest}
 【氛围】${s.overallAtmosphere || '无'} | 治安：${s.securityStatus || '无'} | 星象：${s.astrology || '无'}
 【待爆发事件】${pending}
-【声誉】${repStr}
-</htyq_world>`;
+【声誉】${repStr}`;
+
         try {
             const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext)
                 ? SillyTavern.getContext()
                 : (typeof getContext === 'function' ? getContext() : null);
-            if (ctx && typeof ctx.setExtensionPrompt === 'function') {
-                // position: 2 = BEFORE_PROMPT（故事字符串之前）
-                ctx.setExtensionPrompt('htyq_inject', injectContent, 2, 0, true, 0);
-            }
+            if (!ctx || typeof ctx.saveWorldInfo !== 'function') return;
+
+            // 构建世界书条目（constant=true 始终激活，不依赖关键词）
+            const worldData = {
+                entries: {
+                    '0': {
+                        uid: 0,
+                        key: [],
+                        secondary_keys: [],
+                        comment: '活体引擎世界状态',
+                        content: injectContent,
+                        constant: true,
+                        selective: false,
+                        order: 100,
+                        position: 'before_char',
+                        disable: false
+                    }
+                }
+            };
+
+            ctx.saveWorldInfo('htyq_living_world', worldData).then(async () => {
+                // 首次运行时，将世界书加入全局激活列表
+                if (!worldbookActivated) {
+                    worldbookActivated = true;
+                    try {
+                        const headers = ctx.getRequestHeaders ? ctx.getRequestHeaders() : {};
+                        const resp = await fetch('/api/settings/get', {
+                            method: 'POST',
+                            headers: { ...headers, 'Content-Type': 'application/json' },
+                            body: '{}'
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const real = JSON.parse(data.settings);
+                            const globalSelect = real?.world_info_settings?.world_info?.globalSelect || [];
+                            if (!globalSelect.includes('htyq_living_world')) {
+                                globalSelect.push('htyq_living_world');
+                                await fetch('/api/settings/save', {
+                                    method: 'POST',
+                                    headers: { ...headers, 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(real)
+                                });
+                                console.log('[HTYQ] 活体世界书已激活');
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('[HTYQ] 自动激活世界书失败，请手动在ST全局世界书中启用 htyq_living_world', e);
+                    }
+                }
+            }).catch(e => console.warn('[HTYQ] 保存世界书失败', e));
         } catch(e) {}
     }
 
