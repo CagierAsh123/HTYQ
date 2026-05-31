@@ -192,21 +192,27 @@ window.HTYQ_EVOLUTION_API = (function() {
             if (charWorld && typeof ctx.loadWorldInfo === 'function') {
                 ctx.loadWorldInfo(charWorld).then(book => {
                     const entries = (book && book.entries) ? { ...book.entries } : {};
-                    const existingKey = Object.keys(entries).find(k => entries[k].comment === '活体引擎世界状态');
-                    const uid = existingKey || String(Date.now());
+                    // 通过 key 数组匹配已有条目（比 comment 匹配更可靠）
+                    const HTYQ_KEY = 'htyq_world_state';
+                    const existingKey = Object.keys(entries).find(k => {
+                        const e = entries[k];
+                        return Array.isArray(e.key) && e.key.includes(HTYQ_KEY);
+                    });
+                    const uid = existingKey || '99990001';
                     entries[uid] = {
                         uid: Number(uid),
-                        key: ['htyq_world_state'],
+                        key: [HTYQ_KEY],
                         keysecondary: [],
                         comment: '活体引擎世界状态',
                         content: injectContent,
                         constant: true,
                         selective: false,
-                        order: existingKey ? entries[existingKey].order : 100,
+                        order: 100,
                         position: 'before_char',
                         disable: false
                     };
-                    ctx.saveWorldInfo(charWorld, { entries });
+                    // immediately=true 绕过 debounce，确保即时写入
+                    ctx.saveWorldInfo(charWorld, { entries }, true).catch(() => {});
                 }).catch(() => {});
             }
         } catch(e) {}
