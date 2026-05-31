@@ -84,10 +84,17 @@ window.HTYQ_EVOLUTION_CORE = (function() {
         }
         if (data.economy) {
             if (typeof data.economy.currencyName === 'string') { s.economy.currencyName = data.economy.currencyName; changed = true; }
-            if (typeof data.economy.currencyAmount === 'number') { 
-                if (s.economy.currencyAmount === null) s.economy.currencyAmount = data.economy.currencyAmount;
-                else s.economy.currencyAmount += data.economy.currencyAmount;
-                changed = true;
+            if (typeof data.economy.currencyAmount === 'number') {
+                // 合理性校验：绝对值超过10000视为LLM误填余额，忽略
+                if (Math.abs(data.economy.currencyAmount) > 10000) {
+                    console.warn('[HTYQ] 忽略异常货币变化量:', data.economy.currencyAmount);
+                } else if (s.economy.currencyAmount === null) {
+                    s.economy.currencyAmount = data.economy.currencyAmount;
+                    changed = true;
+                } else {
+                    s.economy.currencyAmount += data.economy.currencyAmount;
+                    changed = true;
+                }
             }
             if (data.economy.marketTrend) { s.economy.marketTrend = data.economy.marketTrend; changed = true; }
             if (Array.isArray(data.economy.keyResources)) { s.economy.keyResources = data.economy.keyResources; changed = true; }

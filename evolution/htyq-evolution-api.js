@@ -141,7 +141,10 @@ window.HTYQ_EVOLUTION_API = (function() {
 
     function injectWorldSummaryToChat() {
         const s = STATE.worldState;
-        const injectContent = `<htyq_world>\n【世界大势】${s.worldDigest}\n【星象】${s.astrology}\n【声誉】${Object.entries(s.reputation).map(([k,v])=>`${k}:${v}`).join(' ')}\n</htyq_world>`;
+        // 精简注入：只给 AI 世界元数据，不包含对对话内容的复述，避免上下文重复
+        const rep = s.reputation;
+        const repStr = `江湖:${rep.jianghu} 官府:${rep.official} 民间:${rep.folk} 黑道:${rep.underworld}`;
+        const injectContent = `<htyq_world>\n星象:${s.astrology} 治安:${s.securityStatus} 氛围:${s.overallAtmosphere}\n声誉:${repStr}\n</htyq_world>`;
         try {
             if (typeof injectPrompts === 'function') {
                 const result = injectPrompts([{ id: 'htyq_inject', position: 'in_chat', depth: 0, role: 'system', content: injectContent, should_scan: true }]);
