@@ -57,10 +57,13 @@ window.HTYQ_UTILS = (function() {
     async function insertActiveContactMessage(contactDesc) {
         try {
             const ctx = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) ? SillyTavern.getContext() : getContext();
-            if (ctx && ctx.sendMessageAsUser) {
-                await ctx.sendMessageAsUser(`⚠️ **【突发接触】**\n${contactDesc}`, { forceNewMessage: true, isSystem: true });
-            } else if (ctx && ctx.addSystemMessage) {
-                ctx.addSystemMessage(`⚠️ **突发接触**\n${contactDesc}`);
+            // 优先用系统消息，不以 user 名义注入，避免 AI 误认为用户做了某事
+            if (ctx && typeof ctx.addSystemMessage === 'function') {
+                ctx.addSystemMessage(`⚠️ **【突发接触】**\n${contactDesc}`);
+            } else if (ctx && ctx.sendSystemMessage) {
+                ctx.sendSystemMessage(`⚠️ **【突发接触】**\n${contactDesc}`);
+            } else {
+                console.warn('[HTYQ] 无法发送系统消息，跳过主动接触通知');
             }
         } catch(e) { console.warn(e); }
     }

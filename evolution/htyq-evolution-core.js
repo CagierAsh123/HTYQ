@@ -56,8 +56,18 @@ window.HTYQ_EVOLUTION_CORE = (function() {
             for (const e of data.events) {
                 if (!e.name) continue;
                 const existing = s.events.find(ev => ev.name === e.name);
-                if (existing) Object.assign(existing, e);
-                else s.events.unshift(e);
+                if (existing) {
+                    // 防滚雪球：无正文新冲突时，禁止事件级别升级
+                    const oldLevel = existing.level || 0;
+                    const newLevel = e.level || 0;
+                    if (newLevel > oldLevel) {
+                        console.warn('[HTYQ] 阻止事件升级:', e.name, '从 Lv.' + oldLevel + ' 到 Lv.' + newLevel + ' — 维持原级别');
+                        e.level = oldLevel;
+                    }
+                    Object.assign(existing, e);
+                } else {
+                    s.events.unshift(e);
+                }
             }
             s.events = s.events.slice(0, 20);
             changed = true;
