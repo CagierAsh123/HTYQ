@@ -3,3 +3,4 @@
 /docs
 CLAUDE.md
 /.scratch
+.claude/settings.local.json
